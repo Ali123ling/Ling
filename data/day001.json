@@ -1,39 +1,91 @@
 {
   "day": 1,
-  "title": "Tensor 基础",
-  "lessonTitle": "Tensor 是什么？",
+  "title": "Tensor 入门三小节",
+  "lessonTitle": "Tensor：从数字到数据结构",
   "chapter": "第二章 · 预备知识",
-  "durationMinutes": 25,
-  "summary": "从土木工程中熟悉的表格与网格出发，理解深度学习里最基础的数据容器。",
-  "content": {
-    "concept": "Tensor（张量）是用来组织数字的多维数据结构。一个数字是 0 维 Tensor，一排数字是 1 维 Tensor，一张数字表格是 2 维 Tensor；继续把表格叠起来，就得到更高维的 Tensor。神经网络接收的数据、内部参数和输出结果，通常都用 Tensor 表示。",
-    "analogy": "把一次结构试验的单个读数看作一个点，把同一时刻多个传感器的读数排成一行，再把不同时刻的读数逐行叠起来，就得到一张二维数据表。这张表在 PyTorch 中就是一个 2 维 Tensor。",
-    "math": {
-      "explanation": "Tensor 的 shape 描述每个方向上有多少个元素。若 X 的 shape 是 (100, 20)，可以把它理解为 100 个样本，每个样本有 20 个特征。",
-      "formula": "X ∈ ℝ^(100 × 20)  →  100 个样本 × 20 个特征"
-    },
-    "engineeringCase": "假设你记录 100 个混凝土试件，每个试件包含抗压强度、龄期、水灰比等 20 项特征。把数据输入机器学习模型时，可以整理成 shape=(100, 20) 的 Tensor。模型看到的不是 Excel 表格，而是这块排列有序的数字。",
-    "code": {
-      "explanation": "下面的代码创建 0 到 11 的整数，并把它们重新排列为 3 行 4 列。代码只用于阅读，无需在页面中运行。",
-      "source": "import torch\n\n# 创建包含 0 到 11 的一维 Tensor\nx = torch.arange(12)\nprint(x)\nprint(x.shape)       # torch.Size([12])\n\n# 重新排列为 3 行 4 列\nX = x.reshape(3, 4)\nprint(X)\nprint(X.shape)       # torch.Size([3, 4])"
-    },
-    "commonMistakes": [
-      "把维度数量和 shape 中的数值混淆：shape=(100, 20) 是二维 Tensor，不是 100 维 Tensor。",
-      "认为 reshape 会改变元素总数：从 12 个元素重排后仍必须是 12 个元素，例如 3×4。",
-      "忽略数据类型：整数 Tensor 和浮点数 Tensor 在某些 PyTorch 运算中不能直接混用。"
-    ]
-  },
+  "durationMinutes": 55,
+  "summary": "今天不只记住一个名词：用三个循序渐进的小节，真正理解 Tensor、会创建它，并能读懂它的 shape。",
   "tasks": [
-    "理解 Tensor 与多维数据的关系",
-    "能够读懂 shape 的含义",
-    "认识 torch.arange 与 reshape"
+    "小节 1：认识 Tensor 是什么",
+    "小节 2：创建第一个 Tensor",
+    "小节 3：读懂 shape 与 reshape"
+  ],
+  "units": [
+    {
+      "title": "Tensor 到底是什么？",
+      "goal": "把 Tensor 和你熟悉的表格、测量数据联系起来。",
+      "concept": "Tensor（张量）是组织数字的多维容器。一个数字是 0 维 Tensor；一排数字是 1 维；一张有行和列的表格是 2 维。把许多表格继续叠放，就能表示图像、视频或一批实验数据。神经网络看到的输入、参数和输出，几乎都以 Tensor 的形式存在。",
+      "analogy": "做结构试验时，一个试件的一次应变读数是一个数字；同一时刻多个传感器的读数是一排数字；把多次采样按时间叠成表格，就是一个二维 Tensor。你已经接触过 Tensor，只是以前把它叫作数据表。",
+      "math": {
+        "explanation": "Tensor 的维度表示需要几个索引才能定位一个数。二维 Tensor 需要“第几行、第几列”两个索引。",
+        "formula": "标量：x ∈ ℝ    向量：x ∈ ℝⁿ    矩阵：X ∈ ℝ^(m × n)"
+      },
+      "code": {
+        "explanation": "下面分别创建一个标量、向量和二维矩阵，观察它们在 PyTorch 中的形状。",
+        "source": "import torch\n\nscalar = torch.tensor(7)\nvector = torch.tensor([2, 4, 6])\nmatrix = torch.tensor([[1, 2], [3, 4]])\n\nprint(scalar.shape)  # torch.Size([])\nprint(vector.shape)  # torch.Size([3])\nprint(matrix.shape)  # torch.Size([2, 2])"
+      },
+      "commonMistakes": [
+        "不要把 shape 里的数字当成维度数量；shape=(2, 3) 是二维，不是 2 维加 3 维。",
+        "Tensor 不一定很复杂：一个单独的数字也是 Tensor。"
+      ]
+    },
+    {
+      "title": "创建第一个 Tensor",
+      "goal": "掌握最常用的三种创建方式，并知道何时使用它们。",
+      "concept": "学习 PyTorch 时，最常见的起点是：直接给出数据、生成等差序列、创建全 0 或全 1 的占位数据。直接给出数据适合小样例；arange 适合编号；zeros 和 ones 常用于先准备好一个指定大小的容器。",
+      "analogy": "像整理实验记录一样：torch.tensor 是把手头的几条记录直接录入；torch.arange 是生成编号 0、1、2……；torch.zeros 则像先画好一张空的记录表，之后再填写数据。",
+      "math": {
+        "explanation": "创建操作最重要的是元素总数和数据类型。深度学习里的连续数值通常使用浮点数，因此经常会看到 float32。",
+        "formula": "torch.arange(0, 12) → [0, 1, 2, …, 11]，共 12 个元素"
+      },
+      "code": {
+        "explanation": "比较三种创建方式。注意 zeros 中的 2 和 3 表示两行三列。",
+        "source": "import torch\n\na = torch.tensor([1.0, 2.5, 3.0])\nb = torch.arange(0, 12)\nc = torch.zeros((2, 3))\n\nprint(a.dtype)   # torch.float32\nprint(b)\nprint(c)"
+      },
+      "commonMistakes": [
+        "torch.arange(12) 生成的是从 0 到 11，不包含 12。",
+        "torch.zeros((2, 3)) 的双括号表示把 shape 作为一个元组传入。",
+        "整数和浮点 Tensor 的运算行为可能不同，训练模型时通常需要浮点数。"
+      ]
+    },
+    {
+      "title": "读懂 shape 与 reshape",
+      "goal": "看见 shape 就能说出样本数、特征数，并安全地重排数据。",
+      "concept": "shape 是 Tensor 最重要的说明书：它依次写出每个方向的长度。机器学习中，二维数据经常约定为“样本数 × 特征数”。reshape 不会新增或删除数字，只会改变这些数字排成什么形状。",
+      "analogy": "如果有 12 个试验数据点，把它们排成 3 行 4 列或 4 行 3 列，本质仍是同一批 12 个点；改变的是你查看数据的方式。这就是 reshape 的工作。",
+      "math": {
+        "explanation": "重排前后的元素总数必须相等。shape=(100, 20) 表示 100 个样本，每个样本有 20 个特征。",
+        "formula": "12 = 3 × 4 = 2 × 6；因此 length=12 的 Tensor 可以 reshape 为 (3, 4) 或 (2, 6)"
+      },
+      "code": {
+        "explanation": "先生成 12 个元素，再重排成 3 行 4 列；最后用 -1 让 PyTorch 自动推断其中一个维度。",
+        "source": "import torch\n\nx = torch.arange(12)\nX = x.reshape(3, 4)\nY = x.reshape(-1, 6)\n\nprint(X.shape)  # torch.Size([3, 4])\nprint(Y.shape)  # torch.Size([2, 6])"
+      },
+      "commonMistakes": [
+        "不能把 12 个元素 reshape 成 (5, 3)，因为 5×3=15。",
+        "shape=(100, 20) 通常不是“100 维”，而是二维数据的 100 行、20 列。",
+        "reshape 改变的是排列方式，不会自动给数据增加新的意义。"
+      ]
+    }
   ],
   "quiz": [
     {
-      "question": "Tensor.shape=(100, 20) 通常表示什么？",
-      "options": ["100 个维度", "100 个样本，每个样本 20 个特征", "20 个样本"],
+      "question": "一张有 100 行、20 列的特征表，在机器学习中通常可表示为？",
+      "options": ["100 维 Tensor", "shape=(100, 20) 的二维 Tensor", "只含 20 个样本的向量"],
       "answerIndex": 1,
-      "explanation": "第一维通常表示样本数量，第二维表示每个样本的特征数量。"
+      "explanation": "第一维通常表示 100 个样本，第二维表示每个样本的 20 个特征。"
+    },
+    {
+      "question": "torch.arange(5) 会生成什么？",
+      "options": ["[1, 2, 3, 4, 5]", "[0, 1, 2, 3, 4]", "5 个全为 0 的数字"],
+      "answerIndex": 1,
+      "explanation": "arange 从 0 开始，终点不包含在结果中。"
+    },
+    {
+      "question": "长度为 12 的 Tensor 可以安全地 reshape 成哪种形状？",
+      "options": ["(5, 3)", "(3, 5)", "(2, 6)"],
+      "answerIndex": 2,
+      "explanation": "reshape 前后元素总数必须一致，只有 2×6 等于 12。"
     }
   ]
 }

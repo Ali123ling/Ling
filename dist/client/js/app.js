@@ -108,10 +108,11 @@ function renderHome() {
   document.querySelector("#task-list").innerHTML = courses.map(course => {
     const complete = Boolean(progress.completedDays[course.day]?.completed);
     const quiz = progress.quizResults[course.day];
+    const currentQuiz = quiz?.questionCount === course.quiz?.length ? quiz : null;
     return `<a class="task-card ${complete ? "is-complete" : ""}" href="#/day/${course.day}" aria-label="${complete ? "已完成" : "未完成"}：Day ${course.day} ${escapeHtml(course.title)}">
       <span class="day-box"><small>DAY</small><b>${String(course.day).padStart(2, "0")}</b></span>
       <span class="task-copy"><p>${escapeHtml(course.chapter)} · 约 ${escapeHtml(course.durationMinutes)} 分钟</p><h3>${escapeHtml(course.title)}</h3><ul>${course.tasks.map(task => `<li>${escapeHtml(task)}</li>`).join("")}</ul></span>
-      <span class="task-status">${complete ? "✓ 已完成" : quiz ? `测验 ${quiz.score}%` : "○ 未完成"}</span>
+      <span class="task-status">${complete ? "✓ 已完成" : currentQuiz ? `测验 ${currentQuiz.score}%` : "○ 未完成"}</span>
     </a>`;
   }).join("");
   renderLearningRecord(progress);
@@ -156,31 +157,38 @@ function renderCalendar(progress) {
   document.querySelector("#calendar-grid").innerHTML = cells.join("");
 }
 
+function renderUnits(course) {
+  return (course.units || []).map((unit, index) => `<section class="lesson-unit">
+    <header class="unit-header"><span class="unit-number">0${index + 1}</span><div><p class="eyebrow">今日小节 ${index + 1} / ${course.units.length}</p><h2>${escapeHtml(unit.title)}</h2><p>${escapeHtml(unit.goal)}</p></div></header>
+    <div class="unit-block"><h3>先用直觉理解</h3><p>${escapeHtml(unit.concept)}</p><div class="analogy-card"><strong>工程类比</strong><p>${escapeHtml(unit.analogy)}</p></div></div>
+    <div class="unit-block"><h3>数学上怎么表示？</h3><p>${escapeHtml(unit.math.explanation)}</p><div class="formula">${escapeHtml(unit.math.formula)}</div></div>
+    <div class="unit-block"><h3>用 PyTorch 看一眼</h3><p>${escapeHtml(unit.code.explanation)}</p><pre><code>${escapeHtml(unit.code.source)}</code></pre></div>
+    <div class="unit-block"><h3>容易踩的坑</h3><ul class="mistakes">${unit.commonMistakes.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+  </section>`).join("");
+}
+
 function renderQuiz(course, result) {
-  const quiz = course.quiz?.[0];
-  if (!quiz) return "";
+  const quizzes = course.quiz || [];
+  if (!quizzes.length) return "";
+  if (result?.questionCount !== quizzes.length) result = null;
   if (result) {
-    return `<section class="lesson-section quiz-section"><h2>6. 小测试</h2><div class="quiz-result ${result.correct ? "correct" : "incorrect"}"><strong>${result.correct ? "回答正确！" : "这题先记下来。"}</strong><p>你的得分：${result.score}%</p><p>${escapeHtml(quiz.explanation)}</p><button class="secondary-button" type="button" data-action="retry-quiz">再试一次</button></div></section>`;
+    const passed = result.correctCount === quizzes.length || (quizzes.length === 1 && result.correct);
+    return `<section class="lesson-section quiz-section"><h2>今日小测试</h2><div class="quiz-result ${passed ? "correct" : "incorrect"}"><strong>${passed ? "全部回答正确！" : "有些知识点值得回看。"}</strong><p>你的得分：${result.score}%（${result.correctCount ?? (result.correct ? 1 : 0)} / ${quizzes.length} 题正确）</p><ul>${quizzes.map((quiz, index) => `<li><b>第 ${index + 1} 题：</b>${escapeHtml(quiz.explanation)}</li>`).join("")}</ul><button class="secondary-button" type="button" data-action="retry-quiz">再试一次</button></div></section>`;
   }
-  return `<section class="lesson-section quiz-section"><h2>6. 小测试</h2><p class="quiz-question">${escapeHtml(quiz.question)}</p><form id="quiz-form" class="quiz-form">${quiz.options.map((option, index) => `<label class="quiz-option"><input type="radio" name="quiz-answer" value="${index}"><span>${String.fromCharCode(65 + index)}</span>${escapeHtml(option)}</label>`).join("")}<button class="secondary-button" type="submit">提交答案</button></form></section>`;
+  return `<section class="lesson-section quiz-section"><h2>今日小测试</h2><p>完成三个小节后，用三道题检查理解程度。</p><form id="quiz-form" class="quiz-form">${quizzes.map((quiz, questionIndex) => `<fieldset class="quiz-group"><legend class="quiz-question">${questionIndex + 1}. ${escapeHtml(quiz.question)}</legend>${quiz.options.map((option, optionIndex) => `<label class="quiz-option"><input type="radio" name="quiz-answer-${questionIndex}" value="${optionIndex}"><span>${String.fromCharCode(65 + optionIndex)}</span>${escapeHtml(option)}</label>`).join("")}</fieldset>`).join("")}<button class="secondary-button" type="submit">提交答案</button></form></section>`;
 }
 
 function renderLesson(course) {
   const progress = readProgress();
   const completion = progress.completedDays[course.day];
   const complete = Boolean(completion?.completed);
-  const sections = course.content;
   const rating = progress.dailyRatings[completion?.completedDate];
   document.querySelector("#lesson-content").innerHTML = `
     <header class="lesson-header"><p class="lesson-kicker">DAY ${String(course.day).padStart(2, "0")} · ${escapeHtml(course.chapter)}</p><h1 id="lesson-title">${escapeHtml(course.lessonTitle)}</h1><p class="lesson-summary">${escapeHtml(course.summary)}</p></header>
-    <section class="lesson-section"><h2>1. 概念解释</h2><p>${escapeHtml(sections.concept)}</p><div class="analogy-card"><strong>直观类比</strong><p>${escapeHtml(sections.analogy)}</p></div></section>
-    <section class="lesson-section"><h2>2. 数学解释</h2><p>${escapeHtml(sections.math.explanation)}</p><div class="formula">${escapeHtml(sections.math.formula)}</div></section>
-    <section class="lesson-section"><h2>3. 工程案例</h2><p>${escapeHtml(sections.engineeringCase)}</p></section>
-    <section class="lesson-section"><h2>4. Python / PyTorch 示例</h2><p>${escapeHtml(sections.code.explanation)}</p><pre><code>${escapeHtml(sections.code.source)}</code></pre></section>
-    <section class="lesson-section"><h2>5. 常见错误</h2><ul class="mistakes">${sections.commonMistakes.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
-    <section class="lesson-section"><h2>本节学习目标</h2><ul class="lesson-tasks">${course.tasks.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+    <section class="lesson-section lesson-roadmap"><h2>今天的三小节</h2><ul class="lesson-tasks">${course.tasks.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+    ${renderUnits(course)}
     ${renderQuiz(course, progress.quizResults[course.day])}
-    <footer class="lesson-footer"><p>${complete ? `你已经完成本节${rating ? `，今天的掌握度：${"★".repeat(rating)}${"☆".repeat(5 - rating)}。` : "，可随时回来复习。"}` : "确认理解核心概念后，记录今天的这一步。"}</p><button id="complete-button" class="primary-button ${complete ? "completed" : ""}" type="button">${complete ? "✓ 已完成学习" : "完成学习"}</button></footer>`;
+    <footer class="lesson-footer"><p>${complete ? `你已经完成今天三小节${rating ? `，今天的掌握度：${"★".repeat(rating)}${"☆".repeat(5 - rating)}。` : "，可随时回来复习。"}` : "完成三个小节后，记录今天的这一步。"}</p><button id="complete-button" class="primary-button ${complete ? "completed" : ""}" type="button">${complete ? "✓ 已完成今日学习" : "完成今日三小节"}</button></footer>`;
   document.querySelector("#complete-button").addEventListener("click", () => completeLesson(course));
   document.querySelector("#quiz-form")?.addEventListener("submit", event => submitQuiz(event, course));
   document.querySelector("[data-action='retry-quiz']")?.addEventListener("click", () => { const data = readProgress(); delete data.quizResults[course.day]; saveProgress(data); renderLesson(course); });
@@ -188,11 +196,12 @@ function renderLesson(course) {
 
 function submitQuiz(event, course) {
   event.preventDefault();
-  const choice = new FormData(event.currentTarget).get("quiz-answer");
-  if (choice === null) { showToast("请先选择一个答案。"); return; }
-  const correct = Number(choice) === course.quiz[0].answerIndex;
+  const form = new FormData(event.currentTarget);
+  const answers = course.quiz.map((_, index) => form.get(`quiz-answer-${index}`));
+  if (answers.some(answer => answer === null)) { showToast("请完成全部三道题后再提交。"); return; }
+  const correctCount = answers.filter((answer, index) => Number(answer) === course.quiz[index].answerIndex).length;
   const progress = readProgress();
-  progress.quizResults[course.day] = { selectedIndex: Number(choice), correct, score: correct ? 100 : 0, answeredAt: new Date().toISOString() };
+  progress.quizResults[course.day] = { answers: answers.map(Number), questionCount: course.quiz.length, correct: correctCount === course.quiz.length, correctCount, score: Math.round((correctCount / course.quiz.length) * 100), answeredAt: new Date().toISOString() };
   saveProgress(progress);
   renderLesson(course);
 }
