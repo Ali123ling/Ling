@@ -1,0 +1,39 @@
+{
+  "day": 1,
+  "title": "Tensor 基础",
+  "lessonTitle": "Tensor 是什么？",
+  "chapter": "第二章 · 预备知识",
+  "durationMinutes": 25,
+  "summary": "从土木工程中熟悉的表格与网格出发，理解深度学习里最基础的数据容器。",
+  "content": {
+    "concept": "Tensor（张量）是用来组织数字的多维数据结构。一个数字是 0 维 Tensor，一排数字是 1 维 Tensor，一张数字表格是 2 维 Tensor；继续把表格叠起来，就得到更高维的 Tensor。神经网络接收的数据、内部参数和输出结果，通常都用 Tensor 表示。",
+    "analogy": "把一次结构试验的单个读数看作一个点，把同一时刻多个传感器的读数排成一行，再把不同时刻的读数逐行叠起来，就得到一张二维数据表。这张表在 PyTorch 中就是一个 2 维 Tensor。",
+    "math": {
+      "explanation": "Tensor 的 shape 描述每个方向上有多少个元素。若 X 的 shape 是 (100, 20)，可以把它理解为 100 个样本，每个样本有 20 个特征。",
+      "formula": "X ∈ ℝ^(100 × 20)  →  100 个样本 × 20 个特征"
+    },
+    "engineeringCase": "假设你记录 100 个混凝土试件，每个试件包含抗压强度、龄期、水灰比等 20 项特征。把数据输入机器学习模型时，可以整理成 shape=(100, 20) 的 Tensor。模型看到的不是 Excel 表格，而是这块排列有序的数字。",
+    "code": {
+      "explanation": "下面的代码创建 0 到 11 的整数，并把它们重新排列为 3 行 4 列。代码只用于阅读，无需在页面中运行。",
+      "source": "import torch\n\n# 创建包含 0 到 11 的一维 Tensor\nx = torch.arange(12)\nprint(x)\nprint(x.shape)       # torch.Size([12])\n\n# 重新排列为 3 行 4 列\nX = x.reshape(3, 4)\nprint(X)\nprint(X.shape)       # torch.Size([3, 4])"
+    },
+    "commonMistakes": [
+      "把维度数量和 shape 中的数值混淆：shape=(100, 20) 是二维 Tensor，不是 100 维 Tensor。",
+      "认为 reshape 会改变元素总数：从 12 个元素重排后仍必须是 12 个元素，例如 3×4。",
+      "忽略数据类型：整数 Tensor 和浮点数 Tensor 在某些 PyTorch 运算中不能直接混用。"
+    ]
+  },
+  "tasks": [
+    "理解 Tensor 与多维数据的关系",
+    "能够读懂 shape 的含义",
+    "认识 torch.arange 与 reshape"
+  ],
+  "quiz": [
+    {
+      "question": "Tensor.shape=(100, 20) 通常表示什么？",
+      "options": ["100 个维度", "100 个样本，每个样本 20 个特征", "20 个样本"],
+      "answerIndex": 1,
+      "explanation": "第一维通常表示样本数量，第二维表示每个样本的特征数量。"
+    }
+  ]
+}
