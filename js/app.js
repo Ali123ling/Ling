@@ -113,7 +113,7 @@ function renderHome() {
   document.querySelector("#task-list").innerHTML = courses.map(course => {
     const complete = isQualifiedCompletion(progress.completedDays[course.day]);
     const quiz = progress.quizResults[course.day];
-    const currentQuiz = quiz?.questionCount === course.quiz?.length ? quiz : null;
+    const currentQuiz = isQuizFullyAnswered(course, quiz) ? quiz : null;
     return `<a class="task-card ${complete ? "is-complete" : ""}" href="#/day/${course.day}" aria-label="${complete ? "已完成" : "未完成"}：Day ${course.day} ${escapeHtml(course.title)}">
       <span class="day-box"><small>DAY</small><b>${String(course.day).padStart(2, "0")}</b></span>
       <span class="task-copy"><p>${escapeHtml(course.chapter)} · 约 ${escapeHtml(course.durationMinutes)} 分钟</p><h3>${escapeHtml(course.title)}</h3><ul>${course.tasks.map(task => `<li>${escapeHtml(task)}</li>`).join("")}</ul></span>
@@ -162,7 +162,7 @@ function renderCalendar(progress) {
   document.querySelector("#calendar-grid").innerHTML = cells.join("");
 }
 
-function renderUnits(course) {
+function renderUnits(course, result) {
   const units = course.units || [];
   activeUnitIndex = Math.max(0, Math.min(activeUnitIndex, units.length - 1));
   const unit = units[activeUnitIndex];
@@ -174,6 +174,7 @@ function renderUnits(course) {
     <div class="unit-block"><h3>数学上怎么表示？</h3><p>${escapeHtml(unit.math.explanation)}</p><div class="formula">${escapeHtml(unit.math.formula)}</div></div>
     <div class="unit-block"><h3>用 PyTorch 看一眼</h3><p>${escapeHtml(unit.code.explanation)}</p><pre><code>${escapeHtml(unit.code.source)}</code></pre></div>
     <div class="unit-block"><h3>容易踩的坑</h3><ul class="mistakes">${unit.commonMistakes.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
+    ${renderUnitQuiz(course, activeUnitIndex, result)}
   </section>`;
 }
 
@@ -184,8 +185,39 @@ function getCourseStudySeconds(progress, courseDay) {
   return saved + live;
 }
 
+function quizCount(course) {
+  return (course.units || []).filter(unit => unit.quiz).length;
+}
+
+function getUnitAnswer(course, result, unitIndex) {
+  const answer = result?.answers?.[unitIndex];
+  if (answer && typeof answer === "object") return answer;
+  if (Array.isArray(result?.answers) && result.answers[unitIndex] !== undefined) {
+    const selectedIndex = Number(result.answers[unitIndex]);
+    return { selectedIndex, correct: selectedIndex === course.units[unitIndex]?.quiz?.answerIndex };
+  }
+  return null;
+}
+
+function getAnswerMap(course, result) {
+  return Object.fromEntries((course.units || []).map((_, index) => [index, getUnitAnswer(course, result, index)]).filter(([, answer]) => answer));
+}
+
+function buildQuizResult(course, answers) {
+  const answeredCount = Object.keys(answers).length;
+  const correctCount = Object.values(answers).filter(answer => answer.correct).length;
+  const total = quizCount(course);
+  return { answers, questionCount: total, answeredCount, correctCount, correct: total > 0 && answeredCount === total && correctCount === total, score: total ? Math.round((correctCount / total) * 100) : 0, answeredAt: new Date().toISOString() };
+}
+
+function isQuizFullyAnswered(course, result) {
+  return Boolean(result && Object.keys(getAnswerMap(course, result)).length === quizCount(course));
+}
+
 function isPerfectQuiz(course, result) {
-  return Boolean(result && result.questionCount === course.quiz?.length && result.correctCount === course.quiz.length);
+  const total = quizCount(course);
+  const answers = Object.values(getAnswerMap(course, result));
+  return Boolean(total && answers.length === total && answers.every(answer => answer.correct));
 }
 
 function canCompleteCourse(course, progress) {
@@ -195,22 +227,20 @@ function canCompleteCourse(course, progress) {
 function renderCompletionFooter(course, progress, complete, rating) {
   const eligible = canCompleteCourse(course, progress);
   const quiz = progress.quizResults[course.day];
-  const quizProgress = isPerfectQuiz(course, quiz) ? "三题全对 ✓" : `${quiz?.correctCount || 0} / ${course.quiz?.length || 0} 题正确`;
+  const correctCount = Object.values(getAnswerMap(course, quiz)).filter(answer => answer.correct).length;
+  const quizProgress = isPerfectQuiz(course, quiz) ? "三题全对 ✓" : `${correctCount} / ${quizCount(course)} 题正确`;
   const minutes = Math.min(60, Math.floor(getCourseStudySeconds(progress, course.day) / 60));
   if (complete) return `<footer class="lesson-footer"><p>你已经完成今天三小节${rating ? `，今天的掌握度：${"★".repeat(rating)}${"☆".repeat(5 - rating)}。` : "，可随时回来复习。"}</p><button id="complete-button" class="primary-button completed" type="button">✓ 已完成今日学习</button></footer>`;
   if (eligible) return `<footer class="lesson-footer"><p>完成条件已达成，现在可以记录今日学习。</p><button id="complete-button" class="primary-button" type="button">完成今日三小节</button></footer>`;
   return `<footer class="lesson-footer completion-gate"><p><strong>完成按钮将在满足任一条件后出现：</strong>三题全对，或本课程累计学习满 60 分钟。</p><div class="gate-progress"><span>测试：${quizProgress}</span><span id="course-time-progress">学习：${minutes} / 60 分钟</span></div></footer>`;
 }
 
-function renderQuiz(course, result) {
-  const quizzes = course.quiz || [];
-  if (!quizzes.length) return "";
-  if (result?.questionCount !== quizzes.length) result = null;
-  if (result) {
-    const passed = result.correctCount === quizzes.length || (quizzes.length === 1 && result.correct);
-    return `<section class="lesson-section quiz-section"><h2>今日小测试</h2><div class="quiz-result ${passed ? "correct" : "incorrect"}"><strong>${passed ? "全部回答正确！" : "有些知识点值得回看。"}</strong><p>你的得分：${result.score}%（${result.correctCount ?? (result.correct ? 1 : 0)} / ${quizzes.length} 题正确）</p><ul>${quizzes.map((quiz, index) => `<li><b>第 ${index + 1} 题：</b>${escapeHtml(quiz.explanation)}</li>`).join("")}</ul><button class="secondary-button" type="button" data-action="retry-quiz">再试一次</button></div></section>`;
-  }
-  return `<section class="lesson-section quiz-section"><h2>今日小测试</h2><p>完成三个小节后，用三道题检查理解程度。</p><form id="quiz-form" class="quiz-form">${quizzes.map((quiz, questionIndex) => `<fieldset class="quiz-group"><legend class="quiz-question">${questionIndex + 1}. ${escapeHtml(quiz.question)}</legend>${quiz.options.map((option, optionIndex) => `<label class="quiz-option"><input type="radio" name="quiz-answer-${questionIndex}" value="${optionIndex}"><span>${String.fromCharCode(65 + optionIndex)}</span>${escapeHtml(option)}</label>`).join("")}</fieldset>`).join("")}<button class="secondary-button" type="submit">提交答案</button></form></section>`;
+function renderUnitQuiz(course, unitIndex, result) {
+  const quiz = course.units[unitIndex]?.quiz;
+  if (!quiz) return "";
+  const answer = getUnitAnswer(course, result, unitIndex);
+  if (answer) return `<section class="unit-quiz"><p class="eyebrow">小节练习</p><h3>检验这一节</h3><div class="quiz-result ${answer.correct ? "correct" : "incorrect"}"><strong>${answer.correct ? "回答正确！" : "再回看一下上面的知识点。"}</strong><p>${escapeHtml(quiz.explanation)}</p><button class="secondary-button" type="button" data-retry-unit="${unitIndex}">重做本题</button></div></section>`;
+  return `<section class="unit-quiz"><p class="eyebrow">小节练习</p><h3>检验这一节</h3><form class="unit-quiz-form quiz-form" data-unit-index="${unitIndex}"><fieldset class="quiz-group"><legend class="quiz-question">${escapeHtml(quiz.question)}</legend>${quiz.options.map((option, optionIndex) => `<label class="quiz-option"><input type="radio" name="unit-quiz-answer" value="${optionIndex}"><span>${String.fromCharCode(65 + optionIndex)}</span>${escapeHtml(option)}</label>`).join("")}</fieldset><button class="secondary-button" type="submit">提交本题</button></form></section>`;
 }
 
 function renderLesson(course) {
@@ -221,12 +251,11 @@ function renderLesson(course) {
   document.querySelector("#lesson-content").innerHTML = `
     <header class="lesson-header"><p class="lesson-kicker">DAY ${String(course.day).padStart(2, "0")} · ${escapeHtml(course.chapter)}</p><h1 id="lesson-title">${escapeHtml(course.lessonTitle)}</h1><p class="lesson-summary">${escapeHtml(course.summary)}</p></header>
     <section class="lesson-section lesson-roadmap"><h2>今天的三小节</h2><ul class="lesson-tasks">${course.tasks.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
-    ${renderUnits(course)}
-    ${renderQuiz(course, progress.quizResults[course.day])}
+    ${renderUnits(course, progress.quizResults[course.day])}
     ${renderCompletionFooter(course, progress, complete, rating)}`;
   document.querySelector("#complete-button")?.addEventListener("click", () => completeLesson(course));
-  document.querySelector("#quiz-form")?.addEventListener("submit", event => submitQuiz(event, course));
-  document.querySelector("[data-action='retry-quiz']")?.addEventListener("click", () => { const data = readProgress(); delete data.quizResults[course.day]; saveProgress(data); renderLesson(course); });
+  document.querySelectorAll(".unit-quiz-form").forEach(form => form.addEventListener("submit", event => submitUnitQuiz(event, course)));
+  document.querySelectorAll("[data-retry-unit]").forEach(button => button.addEventListener("click", () => retryUnitQuiz(course, Number(button.dataset.retryUnit))));
   document.querySelectorAll("[data-unit-step]").forEach(button => button.addEventListener("click", () => {
     activeUnitIndex += Number(button.dataset.unitStep);
     renderLesson(course);
@@ -234,14 +263,26 @@ function renderLesson(course) {
   }));
 }
 
-function submitQuiz(event, course) {
+function submitUnitQuiz(event, course) {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  const answers = course.quiz.map((_, index) => form.get(`quiz-answer-${index}`));
-  if (answers.some(answer => answer === null)) { showToast("请完成全部三道题后再提交。"); return; }
-  const correctCount = answers.filter((answer, index) => Number(answer) === course.quiz[index].answerIndex).length;
+  const selected = form.get("unit-quiz-answer");
+  if (selected === null) { showToast("请先选择一个答案。"); return; }
+  const unitIndex = Number(event.currentTarget.dataset.unitIndex);
+  const question = course.units[unitIndex].quiz;
   const progress = readProgress();
-  progress.quizResults[course.day] = { answers: answers.map(Number), questionCount: course.quiz.length, correct: correctCount === course.quiz.length, correctCount, score: Math.round((correctCount / course.quiz.length) * 100), answeredAt: new Date().toISOString() };
+  const answers = getAnswerMap(course, progress.quizResults[course.day]);
+  answers[unitIndex] = { selectedIndex: Number(selected), correct: Number(selected) === question.answerIndex };
+  progress.quizResults[course.day] = buildQuizResult(course, answers);
+  saveProgress(progress);
+  renderLesson(course);
+}
+
+function retryUnitQuiz(course, unitIndex) {
+  const progress = readProgress();
+  const answers = getAnswerMap(course, progress.quizResults[course.day]);
+  delete answers[unitIndex];
+  progress.quizResults[course.day] = buildQuizResult(course, answers);
   saveProgress(progress);
   renderLesson(course);
 }

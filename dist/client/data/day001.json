@@ -27,7 +27,13 @@
       "commonMistakes": [
         "不要把 shape 里的数字当成维度数量；shape=(2, 3) 是二维，不是 2 维加 3 维。",
         "Tensor 不一定很复杂：一个单独的数字也是 Tensor。"
-      ]
+      ],
+      "quiz": {
+        "question": "一张有 100 行、20 列的特征表，在机器学习中通常可表示为？",
+        "options": ["100 维 Tensor", "shape=(100, 20) 的二维 Tensor", "只含 20 个样本的向量"],
+        "answerIndex": 1,
+        "explanation": "第一维通常表示 100 个样本，第二维表示每个样本的 20 个特征。"
+      }
     },
     {
       "title": "创建第一个 Tensor",
@@ -46,7 +52,13 @@
         "torch.arange(12) 生成的是从 0 到 11，不包含 12。",
         "torch.zeros((2, 3)) 的双括号表示把 shape 作为一个元组传入。",
         "整数和浮点 Tensor 的运算行为可能不同，训练模型时通常需要浮点数。"
-      ]
+      ],
+      "quiz": {
+        "question": "torch.arange(5) 会生成什么？",
+        "options": ["[1, 2, 3, 4, 5]", "[0, 1, 2, 3, 4]", "5 个全为 0 的数字"],
+        "answerIndex": 1,
+        "explanation": "arange 从 0 开始，终点不包含在结果中。"
+      }
     },
     {
       "title": "读懂 shape 与 reshape",
@@ -65,27 +77,13 @@
         "不能把 12 个元素 reshape 成 (5, 3)，因为 5×3=15。",
         "shape=(100, 20) 通常不是“100 维”，而是二维数据的 100 行、20 列。",
         "reshape 改变的是排列方式，不会自动给数据增加新的意义。"
-      ]
-    }
-  ],
-  "quiz": [
-    {
-      "question": "一张有 100 行、20 列的特征表，在机器学习中通常可表示为？",
-      "options": ["100 维 Tensor", "shape=(100, 20) 的二维 Tensor", "只含 20 个样本的向量"],
-      "answerIndex": 1,
-      "explanation": "第一维通常表示 100 个样本，第二维表示每个样本的 20 个特征。"
-    },
-    {
-      "question": "torch.arange(5) 会生成什么？",
-      "options": ["[1, 2, 3, 4, 5]", "[0, 1, 2, 3, 4]", "5 个全为 0 的数字"],
-      "answerIndex": 1,
-      "explanation": "arange 从 0 开始，终点不包含在结果中。"
-    },
-    {
-      "question": "长度为 12 的 Tensor 可以安全地 reshape 成哪种形状？",
-      "options": ["(5, 3)", "(3, 5)", "(2, 6)"],
-      "answerIndex": 2,
-      "explanation": "reshape 前后元素总数必须一致，只有 2×6 等于 12。"
+      ],
+      "quiz": {
+        "question": "长度为 12 的 Tensor 可以安全地 reshape 成哪种形状？",
+        "options": ["(5, 3)", "(3, 5)", "(2, 6)"],
+        "answerIndex": 2,
+        "explanation": "reshape 前后元素总数必须一致，只有 2×6 等于 12。"
+      }
     }
   ]
 }
