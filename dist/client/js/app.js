@@ -13,10 +13,11 @@ const views = {
 let courses = [];
 let calendarCursor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let activeCourseDay = null;
+let activeUnitIndex = 0;
 let selectedRating = 0;
 
 function emptyProgress() {
-  return { version: 2, completedDays: {}, quizResults: {}, dailyRatings: {}, dailyStudySeconds: {}, activeStudy: null };
+  return { version: 2, completedDays: {}, quizResults: {}, dailyRatings: {}, dailyStudySeconds: {}, courseStudySeconds: {}, activeStudy: null };
 }
 
 function readProgress() {
@@ -74,7 +75,11 @@ async function loadCourses() {
 }
 
 function countCompletedOn(dateKey, progress) {
-  return Object.values(progress.completedDays).filter(item => item.completed && item.completedDate === dateKey).length;
+  return Object.values(progress.completedDays).filter(item => isQualifiedCompletion(item) && item.completedDate === dateKey).length;
+}
+
+function isQualifiedCompletion(completion) {
+  return Boolean(completion?.completed && completion.validationMethod);
 }
 
 function isLearningDay(dateKey, progress) {
@@ -93,7 +98,7 @@ function calculateStreak(progress) {
 
 function renderHome() {
   const progress = readProgress();
-  const completedCount = courses.filter(course => progress.completedDays[course.day]?.completed).length;
+  const completedCount = courses.filter(course => isQualifiedCompletion(progress.completedDays[course.day])).length;
   const percentage = courses.length ? (completedCount / courses.length) * 100 : 0;
   document.querySelector("#progress-label").textContent = `已完成 ${completedCount} / ${courses.length}`;
   document.querySelector("#progress-bar").style.width = `${percentage}%`;
@@ -106,7 +111,7 @@ function renderHome() {
   }
 
   document.querySelector("#task-list").innerHTML = courses.map(course => {
-    const complete = Boolean(progress.completedDays[course.day]?.completed);
+    const complete = isQualifiedCompletion(progress.completedDays[course.day]);
     const quiz = progress.quizResults[course.day];
     const currentQuiz = quiz?.questionCount === course.quiz?.length ? quiz : null;
     return `<a class="task-card ${complete ? "is-complete" : ""}" href="#/day/${course.day}" aria-label="${complete ? "已完成" : "未完成"}：Day ${course.day} ${escapeHtml(course.title)}">
@@ -158,13 +163,43 @@ function renderCalendar(progress) {
 }
 
 function renderUnits(course) {
-  return (course.units || []).map((unit, index) => `<section class="lesson-unit">
-    <header class="unit-header"><span class="unit-number">0${index + 1}</span><div><p class="eyebrow">今日小节 ${index + 1} / ${course.units.length}</p><h2>${escapeHtml(unit.title)}</h2><p>${escapeHtml(unit.goal)}</p></div></header>
+  const units = course.units || [];
+  activeUnitIndex = Math.max(0, Math.min(activeUnitIndex, units.length - 1));
+  const unit = units[activeUnitIndex];
+  if (!unit) return "";
+  const number = activeUnitIndex + 1;
+  return `<section class="lesson-unit">
+    <header class="unit-header"><span class="unit-number">${String(number).padStart(2, "0")}</span><div><div class="unit-label-row"><p class="eyebrow">今日小节 ${number} / ${units.length}</p><nav class="unit-navigation" aria-label="切换学习小节"><button type="button" class="unit-nav-button" data-unit-step="-1" aria-label="上一节" ${number === 1 ? "disabled" : ""}>←</button><button type="button" class="unit-nav-button" data-unit-step="1" aria-label="下一节" ${number === units.length ? "disabled" : ""}>→</button></nav></div><h2>${escapeHtml(unit.title)}</h2><p>${escapeHtml(unit.goal)}</p></div></header>
     <div class="unit-block"><h3>先用直觉理解</h3><p>${escapeHtml(unit.concept)}</p><div class="analogy-card"><strong>工程类比</strong><p>${escapeHtml(unit.analogy)}</p></div></div>
     <div class="unit-block"><h3>数学上怎么表示？</h3><p>${escapeHtml(unit.math.explanation)}</p><div class="formula">${escapeHtml(unit.math.formula)}</div></div>
     <div class="unit-block"><h3>用 PyTorch 看一眼</h3><p>${escapeHtml(unit.code.explanation)}</p><pre><code>${escapeHtml(unit.code.source)}</code></pre></div>
     <div class="unit-block"><h3>容易踩的坑</h3><ul class="mistakes">${unit.commonMistakes.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div>
-  </section>`).join("");
+  </section>`;
+}
+
+function getCourseStudySeconds(progress, courseDay) {
+  const saved = Number(progress.courseStudySeconds?.[courseDay] || 0);
+  const active = progress.activeStudy;
+  const live = active?.day === courseDay && !document.hidden ? Math.max(0, Math.floor((Date.now() - new Date(active.startedAt).getTime()) / 1000)) : 0;
+  return saved + live;
+}
+
+function isPerfectQuiz(course, result) {
+  return Boolean(result && result.questionCount === course.quiz?.length && result.correctCount === course.quiz.length);
+}
+
+function canCompleteCourse(course, progress) {
+  return isPerfectQuiz(course, progress.quizResults[course.day]) || getCourseStudySeconds(progress, course.day) >= 3600;
+}
+
+function renderCompletionFooter(course, progress, complete, rating) {
+  const eligible = canCompleteCourse(course, progress);
+  const quiz = progress.quizResults[course.day];
+  const quizProgress = isPerfectQuiz(course, quiz) ? "三题全对 ✓" : `${quiz?.correctCount || 0} / ${course.quiz?.length || 0} 题正确`;
+  const minutes = Math.min(60, Math.floor(getCourseStudySeconds(progress, course.day) / 60));
+  if (complete) return `<footer class="lesson-footer"><p>你已经完成今天三小节${rating ? `，今天的掌握度：${"★".repeat(rating)}${"☆".repeat(5 - rating)}。` : "，可随时回来复习。"}</p><button id="complete-button" class="primary-button completed" type="button">✓ 已完成今日学习</button></footer>`;
+  if (eligible) return `<footer class="lesson-footer"><p>完成条件已达成，现在可以记录今日学习。</p><button id="complete-button" class="primary-button" type="button">完成今日三小节</button></footer>`;
+  return `<footer class="lesson-footer completion-gate"><p><strong>完成按钮将在满足任一条件后出现：</strong>三题全对，或本课程累计学习满 60 分钟。</p><div class="gate-progress"><span>测试：${quizProgress}</span><span id="course-time-progress">学习：${minutes} / 60 分钟</span></div></footer>`;
 }
 
 function renderQuiz(course, result) {
@@ -181,17 +216,22 @@ function renderQuiz(course, result) {
 function renderLesson(course) {
   const progress = readProgress();
   const completion = progress.completedDays[course.day];
-  const complete = Boolean(completion?.completed);
+  const complete = isQualifiedCompletion(completion);
   const rating = progress.dailyRatings[completion?.completedDate];
   document.querySelector("#lesson-content").innerHTML = `
     <header class="lesson-header"><p class="lesson-kicker">DAY ${String(course.day).padStart(2, "0")} · ${escapeHtml(course.chapter)}</p><h1 id="lesson-title">${escapeHtml(course.lessonTitle)}</h1><p class="lesson-summary">${escapeHtml(course.summary)}</p></header>
     <section class="lesson-section lesson-roadmap"><h2>今天的三小节</h2><ul class="lesson-tasks">${course.tasks.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
     ${renderUnits(course)}
     ${renderQuiz(course, progress.quizResults[course.day])}
-    <footer class="lesson-footer"><p>${complete ? `你已经完成今天三小节${rating ? `，今天的掌握度：${"★".repeat(rating)}${"☆".repeat(5 - rating)}。` : "，可随时回来复习。"}` : "完成三个小节后，记录今天的这一步。"}</p><button id="complete-button" class="primary-button ${complete ? "completed" : ""}" type="button">${complete ? "✓ 已完成今日学习" : "完成今日三小节"}</button></footer>`;
-  document.querySelector("#complete-button").addEventListener("click", () => completeLesson(course));
+    ${renderCompletionFooter(course, progress, complete, rating)}`;
+  document.querySelector("#complete-button")?.addEventListener("click", () => completeLesson(course));
   document.querySelector("#quiz-form")?.addEventListener("submit", event => submitQuiz(event, course));
   document.querySelector("[data-action='retry-quiz']")?.addEventListener("click", () => { const data = readProgress(); delete data.quizResults[course.day]; saveProgress(data); renderLesson(course); });
+  document.querySelectorAll("[data-unit-step]").forEach(button => button.addEventListener("click", () => {
+    activeUnitIndex += Number(button.dataset.unitStep);
+    renderLesson(course);
+    document.querySelector(".lesson-unit")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
 }
 
 function submitQuiz(event, course) {
@@ -208,9 +248,18 @@ function submitQuiz(event, course) {
 
 function completeLesson(course) {
   const progress = readProgress();
+  if (!isQualifiedCompletion(progress.completedDays[course.day]) && !canCompleteCourse(course, progress)) {
+    showToast("请先答对全部三题，或累计学习满 60 分钟。");
+    return;
+  }
   const date = localDateKey();
-  const wasComplete = progress.completedDays[course.day]?.completed;
-  progress.completedDays[course.day] = { completed: true, completedAt: new Date().toISOString(), completedDate: date };
+  const wasComplete = isQualifiedCompletion(progress.completedDays[course.day]);
+  progress.completedDays[course.day] = {
+    completed: true,
+    completedAt: new Date().toISOString(),
+    completedDate: date,
+    validationMethod: isPerfectQuiz(course, progress.quizResults[course.day]) ? "perfect-quiz" : "study-time"
+  };
   saveProgress(progress);
   renderLesson(course);
   if (!wasComplete && !progress.dailyRatings[date]) openRatingDialog(date);
@@ -231,6 +280,7 @@ function pauseStudy(progress = readProgress()) {
   if (!active) return;
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(active.startedAt).getTime()) / 1000));
   progress.dailyStudySeconds[active.date] = Number(progress.dailyStudySeconds[active.date] || 0) + seconds;
+  progress.courseStudySeconds[active.day] = Number(progress.courseStudySeconds[active.day] || 0) + seconds;
   progress.activeStudy = null;
   saveProgress(progress);
 }
@@ -277,9 +327,10 @@ function showError(message) { document.querySelector("#error-message").textConte
 function route() {
   pauseStudy();
   const match = window.location.hash.match(/^#\/day\/(\d+)$/);
-  if (!match || window.location.hash === "#/") { activeCourseDay = null; renderHome(); showView("home"); document.title = "ML Growth · 机器学习成长系统"; return; }
+  if (!match || window.location.hash === "#/") { activeCourseDay = null; activeUnitIndex = 0; renderHome(); showView("home"); document.title = "ML Growth · 机器学习成长系统"; return; }
   const course = courses.find(item => item.day === Number(match[1]));
   if (!course) { showError("该课程尚未加入学习计划，请返回首页选择现有任务。"); return; }
+  if (activeCourseDay !== course.day) activeUnitIndex = 0;
   activeCourseDay = course.day;
   renderLesson(course); showView("lesson"); beginStudy(course.day); document.title = `${course.lessonTitle} · ML Growth`;
 }
@@ -293,7 +344,17 @@ function bindEvents() {
   document.addEventListener("visibilitychange", () => { if (document.hidden) pauseStudy(); else if (activeCourseDay) beginStudy(activeCourseDay); });
   window.addEventListener("beforeunload", () => pauseStudy());
   window.addEventListener("hashchange", route);
-  window.setInterval(() => { if (!document.hidden && !views.home.hidden) renderLearningRecord(readProgress()); }, 30000);
+  window.setInterval(() => {
+    if (document.hidden) return;
+    if (!views.home.hidden) renderLearningRecord(readProgress());
+    if (!views.lesson.hidden && activeCourseDay) {
+      const progress = readProgress();
+      const course = courses.find(item => item.day === activeCourseDay);
+      const time = document.querySelector("#course-time-progress");
+      if (course && canCompleteCourse(course, progress) && time) renderLesson(course);
+      else if (time) time.textContent = `学习：${Math.min(60, Math.floor(getCourseStudySeconds(progress, activeCourseDay) / 60))} / 60 分钟`;
+    }
+  }, 30000);
 }
 
 async function start() {
