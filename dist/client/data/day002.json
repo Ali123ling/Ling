@@ -1,0 +1,90 @@
+{
+  "day": 2,
+  "title": "Tensor 数据操作",
+  "lessonTitle": "让 Tensor 开始流动",
+  "chapter": "第二章 · 预备知识",
+  "durationMinutes": 55,
+  "summary": "学会从 Tensor 中取数据、把数据拼在一起，并理解深度学习里无处不在的广播机制。",
+  "tasks": [
+    "小节 1：用索引和切片取数据",
+    "小节 2：拼接与堆叠 Tensor",
+    "小节 3：理解广播机制"
+  ],
+  "units": [
+    {
+      "title": "用索引和切片取数据",
+      "goal": "能从一维和二维 Tensor 中准确取出一个元素、一行或一个子区域。",
+      "concept": "索引就是给数据编号后按位置取值。Python 和 PyTorch 都从 0 开始计数：x[0] 是第一个元素。切片使用 start:stop，包含 start 但不包含 stop；它适合一次取一段连续数据。二维 Tensor 则先写行索引，再写列索引。",
+      "analogy": "把 Tensor 想成试验数据表：X[2, 1] 是“第 3 个试件”的“第 2 个特征”；X[:, 0] 是所有试件的第一个特征；X[1:3] 则是取第 2 到第 3 个试件。",
+      "math": {
+        "explanation": "若 x 的长度为 n，合法的单个索引是 0 到 n−1。对矩阵 X∈ℝ^(m×n)，X[i, j] 表示第 i 行、第 j 列的元素。",
+        "formula": "x[a:b] = [xₐ, xₐ₊₁, …, xᵦ₋₁]"
+      },
+      "code": {
+        "explanation": "观察单元素索引、行切片和列切片分别返回什么。",
+        "source": "import torch\n\nX = torch.arange(12).reshape(3, 4)\nprint(X)\nprint(X[1, 2])   # 第 2 行、第 3 列：6\nprint(X[1])      # 第 2 行\nprint(X[:, 0])   # 所有行的第 1 列\nprint(X[0:2, 1:3])  # 前两行、第 2 到第 3 列"
+      },
+      "commonMistakes": [
+        "切片 x[1:4] 实际得到下标 1、2、3，不包含下标 4。",
+        "二维索引 X[1, 2] 和 X[1][2] 常能得到同一元素，但前者更清楚也更常用。",
+        "不要把“第 3 行”误写成下标 3；下标从 0 开始，因此应为 2。"
+      ],
+      "quiz": {
+        "question": "若 x=torch.tensor([10, 20, 30, 40])，x[1:3] 的结果是？",
+        "options": ["[10, 20, 30]", "[20, 30]", "[20, 30, 40]"],
+        "answerIndex": 1,
+        "explanation": "切片包含起点 1，对应 20；不包含终点 3，因此结果是 20、30。"
+      }
+    },
+    {
+      "title": "拼接与堆叠 Tensor",
+      "goal": "区分 cat 与 stack，知道它们分别改变哪一个维度。",
+      "concept": "真实数据常来自多个批次或多个传感器，因此需要合并。torch.cat 把已有维度延长，好比把两张表上下接起来或左右接起来；torch.stack 会新建一个维度，好比把多张同样大小的表叠成一摞。",
+      "analogy": "两次试验各得到一张 3×2 的数据表。用 cat(dim=0) 像把试件名单继续往下写，得到 6×2；用 stack(dim=0) 像给每次试验加一个“批次”标签，得到 2×3×2。",
+      "math": {
+        "explanation": "拼接时，除拼接维度外的其他 shape 必须一致。堆叠时，每一张 Tensor 的 shape 必须完全相同。",
+        "formula": "cat([A, B], dim=0)：(m,n)+(k,n)→(m+k,n)；stack([A,B],dim=0)：(m,n)→(2,m,n)"
+      },
+      "code": {
+        "explanation": "下面的 A、B 都是 2 行 3 列，比较 cat 和 stack 后的 shape。",
+        "source": "import torch\n\nA = torch.tensor([[1, 2, 3], [4, 5, 6]])\nB = torch.tensor([[7, 8, 9], [10, 11, 12]])\n\nprint(torch.cat((A, B), dim=0).shape)    # [4, 3]\nprint(torch.cat((A, B), dim=1).shape)    # [2, 6]\nprint(torch.stack((A, B), dim=0).shape)  # [2, 2, 3]"
+      },
+      "commonMistakes": [
+        "cat 不会新增维度；需要新增“批次”这一层时应使用 stack。",
+        "沿 dim=0 拼接时列数必须相同，沿 dim=1 拼接时行数必须相同。",
+        "cat 的参数是一个 Tensor 序列，例如 torch.cat((A, B), dim=0)。"
+      ],
+      "quiz": {
+        "question": "两个 shape=(2, 3) 的 Tensor 进行 torch.stack((A, B), dim=0) 后，shape 是？",
+        "options": ["(4, 3)", "(2, 6)", "(2, 2, 3)"],
+        "answerIndex": 2,
+        "explanation": "stack 新建了最前面的批次维度，因此结果是 2×2×3。"
+      }
+    },
+    {
+      "title": "理解广播机制",
+      "goal": "看懂不同 shape 的 Tensor 为什么能相加，并知道何时会报错。",
+      "concept": "广播机制让形状不同、但兼容的 Tensor 能一起运算。PyTorch 会从最后一个维度开始比较：两个维度相等，或其中一个为 1，就能在这个方向上扩展。它不是真的复制大量数据，而是在运算时按规则对齐。",
+      "analogy": "给每个试件的 3 个特征都减去同一组平均值时，平均值是长度为 3 的向量，而试件数据是多行 3 列的表。广播会把这组平均值“看作”在每一行都出现一次，让每个试件都能完成同样的校正。",
+      "math": {
+        "explanation": "若 X 的 shape 是 (2, 3)，y 的 shape 是 (3,)，y 会被视为 shape=(1, 3)，再沿第一个维度扩展到 (2, 3)。",
+        "formula": "(2, 3) + (3,) → (2, 3)；(2, 3) + (2,) → 不兼容"
+      },
+      "code": {
+        "explanation": "每一行都加上同一个长度为 3 的向量；观察结果如何按列重复。",
+        "source": "import torch\n\nX = torch.tensor([[1, 2, 3], [4, 5, 6]])\ny = torch.tensor([10, 20, 30])\n\nprint(X + y)\n# tensor([[11, 22, 33],\n#         [14, 25, 36]])\n\nprint(X + 1)  # 标量也能广播到每个元素"
+      },
+      "commonMistakes": [
+        "广播从最后一个维度对齐，不是从第一个维度开始。",
+        "shape=(2, 3) 与 shape=(2,) 不能直接相加：最后一维 3 和 2 不匹配。",
+        "广播方便但要确认语义正确，避免把本应按列处理的数据错误地按行处理。"
+      ],
+      "quiz": {
+        "question": "shape=(2, 3) 的 X 能直接与哪个 shape 的 Tensor 相加并得到 (2, 3)？",
+        "options": ["(3,)", "(2,)", "(4, 3)"],
+        "answerIndex": 0,
+        "explanation": "(3,) 会对齐为 (1, 3)，随后沿行方向广播为 (2, 3)。"
+      }
+    }
+  ]
+}

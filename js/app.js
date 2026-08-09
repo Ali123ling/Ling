@@ -1,6 +1,6 @@
 "use strict";
 
-const COURSE_FILES = ["data/day001.json"];
+const COURSE_FILES = ["data/day001.json", "data/day002.json"];
 const STORAGE_KEY = "ml-growth:v2:progress";
 const LEGACY_STORAGE_KEY = "ml-growth:v1:progress";
 const WEEKDAYS = ["一", "二", "三", "四", "五", "六", "日"];
@@ -103,7 +103,7 @@ function renderHome() {
   document.querySelector("#progress-label").textContent = `已完成 ${completedCount} / ${courses.length}`;
   document.querySelector("#progress-bar").style.width = `${percentage}%`;
 
-  const nextCourse = courses.find(course => !progress.completedDays[course.day]?.completed) || courses[0];
+  const nextCourse = courses.find(course => !isQualifiedCompletion(progress.completedDays[course.day])) || courses[0];
   const continueButton = document.querySelector("#continue-button");
   if (nextCourse) {
     continueButton.href = `#/day/${nextCourse.day}`;
